@@ -1,36 +1,23 @@
-import os
-import numpy as np
-import nibabel as nib
-from skimage.transform import resize
+import tensorflow as tf
+from tensorflow.keras import layers, models
 
-def load_nifti(path):
-    return nib.load(path).get_fdata()
-
-def apply_clahe_3d(volume):
-    import cv2
-    volume_clahe = np.zeros_like(volume)
-    for i in range(volume.shape[2]):
-        slice_ = volume[:, :, i]
-        slice_norm = cv2.normalize(slice_, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        volume_clahe[:, :, i] = clahe.apply(slice_norm)
-    return volume_clahe
-
-def resize_volume(vol, shape=(128,128,64)):
-    return resize(vol, shape, preserve_range=True, anti_aliasing=True)
-
-def load_dataset(images_dir, labels_dir, max_samples=None, shape=(128,128,64)):
-    images, masks = [], []
-    files = sorted([f for f in os.listdir(images_dir) if f.endswith('.nii.gz')])
-    if max_samples:
-        files = files[:max_samples]
-    for file in files:
-        img = load_nifti(os.path.join(images_dir, file))
-        img = apply_clahe_3d(img)
-        img = resize_volume(img, shape)
-        images.append(img[..., np.newaxis])
-        label_file = file.replace('_0000.nii.gz', '.nii.gz')
-        mask = load_nifti(os.path.join(labels_dir, label_file))
-        mask = resize_volume(mask, shape)
-        masks.append(mask[..., np.newaxis])
-    return np.array(images), np.array(masks)
+def unet_3d(input_shape=(128,128,64,1)):
+    inputs = layers.Input(input_shape)
+    c1 = layers.Conv3D(32, 3, activation='relu', padding='same')(inputs)
+    c1 = layers.Conv3D(32, 3, activation='relu', padding='same')(c1)
+    p1 = layers.MaxPooling3D(2)(c1)
+    c2 = layers.Conv3D(64, 3, activation='relu', padding='same')(p1)
+    c2 = layers.Conv3D(64, 3, activation='relu', padding='same')(c2)
+    p2 = layers.MaxPooling3D(2)(c2)
+    b = layers.Conv3D(128, 3, activation='relu', padding='same')(p2)
+    b = layers.Conv3D(128, 3, activation='relu', padding='same')(b)
+    u1 = layers.UpSampling3D(2)(b)
+    u1 = layers.concatenate([u1, c2])
+    c3 = layers.Conv3D(64, 3, activation='relu', padding='same')(u1)
+    c3 = layers.Conv3D(64, 3, activation='relu', padding='same')(c3)
+    u2 = layers.UpSampling3D(2)(c3)
+    u2 = layers.concatenate([u2, c1])
+    c4 = layers.Conv3D(32, 3, activation='relu', padding='same')(u2)
+    c4 = layers.Conv3D(32, 3, activation='relu', padding='same')(c4)
+    outputs = layers.Conv3D(1, 1, activation='sigmoid')(c4)
+    return models.Model(inputs, outputs)
