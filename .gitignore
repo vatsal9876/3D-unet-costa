@@ -1,0 +1,15 @@
+vessel12_split/
+
+!models/**/*.keras
+!results/
+
+__pycache__/
+*.py[cod]
+.vscode/
+.ipynb_checkpoints/
+.DS_Store
+*.log
+**/logs/
+**/*.tfevents.*
+
+.ipynb_checkpoints/
