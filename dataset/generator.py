@@ -3,7 +3,8 @@ from .loader import load_volume, normalize_ct
 from .sampler import extract_patch
 import gc
 
-def data_generator(image_paths, mask_paths, patch_size=48, min_vessel_voxels=50, batch_size=1):
+
+def data_generator(image_paths, mask_paths, patch_size=96, min_vessel_voxels=200, batch_size=1 , depth_patch_size=64):
     n = len(image_paths)
 
     while True:
@@ -18,6 +19,7 @@ def data_generator(image_paths, mask_paths, patch_size=48, min_vessel_voxels=50,
             ip, mp = extract_patch(
                 img, msk,
                 patch_size=patch_size,
+                depth_patch_size=depth_patch_size,
                 min_vessel_voxels=min_vessel_voxels
             )
 

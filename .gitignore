@@ -1,4 +1,5 @@
-vessel12_split/
+costa
+costa_xyz
 
 !models/**/*.keras
 !results/

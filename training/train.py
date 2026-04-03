@@ -34,21 +34,23 @@ from model import build_unet_3d as unet_3d
 from utils.losses import combined_loss, dice_loss   # ✅ FIXED (added dice_loss)
 
 
-patch_size = 32
+patch_size = 96
+depth_patch_size =64
+min_vessel_voxels = 200
 
 
 
 # -------------------------------------------------
 # DATASET PATHS
 # -------------------------------------------------
-images_dir = "/home/vatsal/projects/3D-unet-costa/vessel12_split/train_val/images"
-labels_dir = "/home/vatsal/projects/3D-unet-costa/vessel12_split/train_val/masks"
+images_dir = "/home/vatsal/projects/3D-unet-costa/costa/COSTA_dataset_v1/COSTA-Dataset-v1/imagesTr/ADAM"
+labels_dir = "/home/vatsal/projects/3D-unet-costa/costa/COSTA_dataset_v1/COSTA-Dataset-v1/labelsTr/ADAM"
 
 
 # -------------------------------------------------
 # GET SCAN PATHS
 # -------------------------------------------------
-image_files = sorted([f for f in os.listdir(images_dir) if f.endswith(".mhd")])
+image_files = sorted([f for f in os.listdir(images_dir) if f.endswith(".nii.gz")])
 
 image_paths = [os.path.join(images_dir, f) for f in image_files]
 mask_paths  = [os.path.join(labels_dir, f) for f in image_files]
@@ -75,35 +77,41 @@ train_gen = data_generator(
     train_img,
     train_mask,
     patch_size=patch_size,
-    min_vessel_voxels=50
+    depth_patch_size=depth_patch_size,
+    min_vessel_voxels=min_vessel_voxels,
+
 )
 
 val_gen = data_generator(
     val_img,
     val_mask,
     patch_size=patch_size,
-    min_vessel_voxels=50
+    depth_patch_size=depth_patch_size,
+    min_vessel_voxels=min_vessel_voxels
 )
 
 
 # -------------------------------------------------
 # TF DATASETS
 # -------------------------------------------------
+# TF DATASETS
+
 train_dataset = tf.data.Dataset.from_generator(
     lambda: train_gen,
     output_signature=(
-        tf.TensorSpec(shape=(None,32,32,32,1), dtype=tf.float32),
-        tf.TensorSpec(shape=(None,32,32,32,1), dtype=tf.float32)
+        tf.TensorSpec(shape=(None,depth_patch_size,patch_size,patch_size,1), dtype=tf.float32),
+        tf.TensorSpec(shape=(None,depth_patch_size,patch_size,patch_size,1), dtype=tf.float32)
     )
 )
 
 val_dataset = tf.data.Dataset.from_generator(
     lambda: val_gen,
     output_signature=(
-        tf.TensorSpec(shape=(None,32,32,32,1), dtype=tf.float32),
-        tf.TensorSpec(shape=(None,32,32,32,1), dtype=tf.float32)
+        tf.TensorSpec(shape=(None,depth_patch_size,patch_size,patch_size,1), dtype=tf.float32),
+        tf.TensorSpec(shape=(None,depth_patch_size,patch_size,patch_size,1), dtype=tf.float32)
     )
 )
+
 
 
 # ❌ REMOVED .batch(1) → generator already returns batch
@@ -162,23 +170,25 @@ callbacks = [
     )
 ]
 
-
 # -------------------------------------------------
 # BUILD MODEL
 # -------------------------------------------------
-model = unet_3d(
-    input_shape=(32,32,32,1),
-    base_filters=16
+model = build_unet_3d(
+    depth=depth_patch_size,
+    width=patch_size,
+    height=patch_size,
+    base_filters=32
 )
 
 
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(1e-4),
-    loss=combined_loss,
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    loss=combined_loss, # This contains clDice + Dice + Focal
     metrics=[
-        dice_loss,
-        tf.keras.metrics.Precision(thresholds=0.5),
-        tf.keras.metrics.Recall(thresholds=0.5)
+        dice_loss,      # Tracks Volume Overlap
+        cldice_loss,   # Tracks Vessel Connectivity (Crucial for OpsTwin!)
+        tf.keras.metrics.Precision(name='prec'),
+        tf.keras.metrics.Recall(name='recall')
     ]
 )
 
@@ -198,11 +208,11 @@ history = model.fit(
 
     validation_data=val_dataset,
 
-    steps_per_epoch=30,
+    steps_per_epoch=100,
 
-    validation_steps=20,
+    validation_steps=30,
 
-    epochs=300,
+    epochs=100,
 
     callbacks=callbacks
 )
