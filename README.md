@@ -13,6 +13,28 @@ It is specifically designed to handle thin, branching vessels, which are difficu
 The system is trained and evaluated on a subset of the ADAM dataset (COSTA benchmark), focusing on accurate and structurally consistent vessel extraction.
 
 ---
+## Usage
+
+### 1. Clone the repository
+git clone https://github.com/your-username/repo-name.git
+cd repo-name
+
+### 2. Install dependencies
+pip install -r requirements.txt
+
+### 3. Dataset setup
+This project uses the **COSTA dataset** (not included in the repository).
+
+- Download the dataset from: <link>
+- Update the dataset paths inside the code before running (currently hardcoded)
+
+### 4. Training
+python train.py
+
+### 5. Inference
+python infer.py
+
+---
 
 ## Key highlights
 
